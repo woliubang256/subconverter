@@ -79,6 +79,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             SHA=${{ steps.vars.outputs.sha_short }}
+            REPO=${{ github.repository }}
+            REF=${{ github.ref_name }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -139,3 +141,22 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+      - name: Smoke test
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+          docker run -d --name sc -p 25500:25500 "$IMAGE"
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:25500/version; then ok=1; echo; break; fi
+            sleep 2
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::subconverter did not become ready"
+            docker logs sc
+            docker rm -f sc
+            exit 1
+          fi
+          echo "--- protocol symbols present in binary ---"
+          docker exec sc sh -c 'strings /usr/bin/subconverter | grep -ciE "mieru|anytls|reality"' || echo "strings unavailable"
+          docker rm -f sc

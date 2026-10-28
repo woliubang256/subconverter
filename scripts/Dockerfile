@@ -2,6 +2,9 @@ FROM alpine:3.16 AS builder
 LABEL maintainer="tindy.it@gmail.com"
 ARG THREADS="4"
 ARG SHA=""
+# source repository to build from: owner/name on GitHub
+ARG REPO="tindy2013/subconverter"
+ARG REF=""
 
 # build minimized
 WORKDIR /
@@ -35,7 +38,7 @@ RUN set -xe && \
     cmake -DCMAKE_CXX_STANDARD=11 . && \
     make install -j $THREADS && \
     cd .. && \
-    git clone https://github.com/tindy2013/subconverter --depth=1 && \
+    git clone https://github.com/${REPO} --depth=1 ${REF:+--branch ${REF}} subconverter && \
     cd subconverter && \
     [ -n "$SHA" ] && sed -i 's/\(v[0-9]\.[0-9]\.[0-9]\)/\1-'"$SHA"'/' src/version.h;\
     python3 -m ensurepip && \
