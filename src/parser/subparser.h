@@ -92,6 +92,10 @@ void explodeShadowrocket(std::string kit, Proxy &node);
 void explodeKitsunebi(std::string kit, Proxy &node);
 void explodeHysteria2(std::string hysteria2, Proxy &node);
 void explodeAnyTLS(std::string anytls, Proxy &node);
+void explodeVLESS(std::string vless, Proxy &node);
+void explodeTUIC(std::string tuic, Proxy &node);
+void explodeMieru(std::string mieru, Proxy &node);
+void explodeMieruJson(const std::string &content, const std::string &remarks, Proxy &node);
 
 /// Parse a link
 void explode(const std::string &link, Proxy &node);

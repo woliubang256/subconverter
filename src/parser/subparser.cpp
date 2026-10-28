@@ -271,6 +271,113 @@ void anyTLSConstruct(
     node.SNI = sni;
 }
 
+void vlessConstruct(
+    Proxy &node,
+    const std::string &group,
+    const std::string &remarks,
+    const std::string &server,
+    const std::string &port,
+    const std::string &uuid,
+    const std::string &flow,
+    const std::string &encryption,
+    const std::string &security,
+    const std::string &network,
+    const std::string &host,
+    const std::string &path,
+    const std::string &mode,
+    const std::string &sni,
+    const std::string &alpn,
+    const std::string &fingerprint,
+    const std::string &public_key,
+    const std::string &short_id,
+    const std::string &spider_x,
+    tribool udp,
+    tribool tfo,
+    tribool scv,
+    tribool tls13,
+    const std::string &underlying_proxy
+) {
+    commonConstruct(node, ProxyType::VLESS, group, remarks, server, port, udp, tfo, scv, tls13, underlying_proxy);
+    node.UserId = uuid.empty() ? "00000000-0000-0000-0000-000000000000" : uuid;
+    node.Flow = flow;
+    node.Encryption = encryption;
+    node.Security = security.empty() ? "none" : security;
+    node.TLSSecure = node.Security == "tls" || node.Security == "reality" || node.Security == "xtls";
+    node.TransferProtocol = network.empty() ? "tcp" : network;
+    node.Host = host;
+    node.Path = path;
+    node.Mode = mode;
+    node.SNI = sni;
+    node.Fingerprint = fingerprint;
+    node.PublicKey = public_key;
+    node.ShortId = short_id;
+    node.SpiderX = spider_x;
+    if (!alpn.empty())
+        node.Alpn = split(alpn, ",");
+}
+
+void tuicConstruct(
+    Proxy &node,
+    const std::string &group,
+    const std::string &remarks,
+    const std::string &server,
+    const std::string &port,
+    const std::string &uuid,
+    const std::string &password,
+    const std::string &token,
+    const std::string &sni,
+    const std::string &alpn,
+    const std::string &congestion_controller,
+    const std::string &udp_relay_mode,
+    tribool reduce_rtt,
+    tribool disable_sni,
+    tribool udp,
+    tribool tfo,
+    tribool scv,
+    const std::string &underlying_proxy
+) {
+    commonConstruct(node, ProxyType::TUIC, group, remarks, server, port, udp, tfo, scv, tribool(), underlying_proxy);
+    node.TLSSecure = true;
+    node.UserId = uuid;
+    node.Password = password;
+    node.Token = token;
+    node.SNI = sni;
+    node.CongestionController = congestion_controller;
+    node.UDPRelayMode = udp_relay_mode;
+    node.ReduceRTT = reduce_rtt;
+    node.DisableSNI = disable_sni;
+    if (!alpn.empty())
+        node.Alpn = split(alpn, ",");
+}
+
+void mieruConstruct(
+    Proxy &node,
+    const std::string &group,
+    const std::string &remarks,
+    const std::string &server,
+    const std::string &port,
+    const std::string &port_range,
+    const std::string &transport,
+    const std::string &username,
+    const std::string &password,
+    const std::string &multiplexing,
+    const std::string &handshake_mode,
+    const std::string &traffic_pattern,
+    tribool udp,
+    tribool tfo,
+    tribool scv,
+    const std::string &underlying_proxy
+) {
+    commonConstruct(node, ProxyType::Mieru, group, remarks, server, port, udp, tfo, scv, tribool(), underlying_proxy);
+    node.Ports = port_range;
+    node.TransferProtocol = transport.empty() ? "TCP" : transport;
+    node.Username = username;
+    node.Password = password;
+    node.Multiplexing = multiplexing;
+    node.HandshakeMode = handshake_mode;
+    node.TrafficPattern = traffic_pattern;
+}
+
 void explodeVmess(std::string vmess, Proxy &node)
 {
     std::string version, ps, add, port, type, id, aid, net, path, host, tls, sni;
@@ -1122,8 +1229,9 @@ void explodeClash(Node yamlnode, std::vector<Proxy> &nodes)
     std::string ip, ipv6, private_key, public_key, mtu; //wireguard
     std::string ports, obfs_protocol, up, up_speed, down, down_speed, auth, auth_str,/* obfs, sni,*/ fingerprint, ca, ca_str, recv_window_conn, recv_window, disable_mtu_discovery, hop_interval, alpn; //hysteria
     std::string obfs_password, cwnd; //hysteria2
+    std::string port_range, token, flow, encryption, security, short_id, spider_x, transport, multiplexing, handshake_mode, traffic_pattern, congestion_controller, udp_relay_mode, alpn_list, mode; //vless / tuic / mieru
     string_array dns_server;
-    tribool udp, tfo, scv;
+    tribool udp, tfo, scv, reduce_rtt, disable_sni;
     Node singleproxy;
     uint32_t index = nodes.size();
     const std::string section = yamlnode["proxies"].IsDefined() ? "proxies" : "Proxy";
@@ -1136,7 +1244,9 @@ void explodeClash(Node yamlnode, std::vector<Proxy> &nodes)
         singleproxy["server"] >>= server;
         singleproxy["port"] >>= port;
         singleproxy["underlying-proxy"] >>= underlying_proxy;
-        if(port.empty() || port == "0")
+        port_range.clear();
+        singleproxy["port-range"] >>= port_range;
+        if((port.empty() || port == "0") && port_range.empty())
             continue;
         udp = safe_as<std::string>(singleproxy["udp"]);
         tfo = safe_as<std::string>(singleproxy["fast-open"]);
@@ -1396,6 +1506,107 @@ void explodeClash(Node yamlnode, std::vector<Proxy> &nodes)
 
             anyTLSConstruct(node, group, ps, server, port, password, sni, udp, tfo, scv, underlying_proxy);
             break;
+        case "vless"_hash:
+            group = VLESS_DEFAULT_GROUP;
+
+            singleproxy["uuid"] >>= id;
+            singleproxy["flow"] >>= flow;
+            singleproxy["encryption"] >>= encryption;
+            net = singleproxy["network"].IsDefined() ? safe_as<std::string>(singleproxy["network"]) : "tcp";
+            singleproxy["servername"] >>= sni;
+            if(sni.empty())
+                singleproxy["sni"] >>= sni;
+            singleproxy["client-fingerprint"] >>= fingerprint;
+            if(fingerprint.empty())
+                singleproxy["fingerprint"] >>= fingerprint;
+            alpn_list.clear();
+            if(singleproxy["alpn"].IsSequence())
+            {
+                string_array alpn_array;
+                for(auto &&item : singleproxy["alpn"])
+                    alpn_array.emplace_back(item.as<std::string>());
+                alpn_list = join(alpn_array, ",");
+            }
+            else
+                singleproxy["alpn"] >>= alpn_list;
+            if(singleproxy["reality-opts"].IsDefined())
+            {
+                security = "reality";
+                singleproxy["reality-opts"]["public-key"] >>= public_key;
+                singleproxy["reality-opts"]["short-id"] >>= short_id;
+            }
+            else
+                security = safe_as<std::string>(singleproxy["tls"]) == "true" ? "tls" : "none";
+            switch(hash_(net))
+            {
+            case "ws"_hash:
+                path = singleproxy["ws-opts"]["path"].IsDefined() ? safe_as<std::string>(singleproxy["ws-opts"]["path"]) : "/";
+                singleproxy["ws-opts"]["headers"]["Host"] >>= host;
+                break;
+            case "httpupgrade"_hash:
+                path = singleproxy["ws-opts"]["path"].IsDefined() ? safe_as<std::string>(singleproxy["ws-opts"]["path"]) : "/";
+                singleproxy["ws-opts"]["headers"]["Host"] >>= host;
+                break;
+            case "grpc"_hash:
+                singleproxy["grpc-opts"]["grpc-service-name"] >>= path;
+                break;
+            case "h2"_hash:
+                singleproxy["h2-opts"]["path"] >>= path;
+                singleproxy["h2-opts"]["host"][0] >>= host;
+                break;
+            case "http"_hash:
+                singleproxy["http-opts"]["path"][0] >>= path;
+                singleproxy["http-opts"]["headers"]["Host"][0] >>= host;
+                break;
+            case "xhttp"_hash:
+                singleproxy["xhttp-opts"]["path"] >>= path;
+                singleproxy["xhttp-opts"]["host"] >>= host;
+                singleproxy["xhttp-opts"]["mode"] >>= mode;
+                break;
+            default:
+                net = "tcp";
+                path.clear();
+                break;
+            }
+
+            vlessConstruct(node, group, ps, server, port, id, flow, encryption, security, net, host, path, mode, sni, alpn_list, fingerprint, public_key, short_id, spider_x, udp, tfo, scv, tribool(), underlying_proxy);
+            break;
+        case "tuic"_hash:
+            group = TUIC_DEFAULT_GROUP;
+
+            singleproxy["uuid"] >>= id;
+            singleproxy["password"] >>= password;
+            singleproxy["token"] >>= token;
+            singleproxy["sni"] >>= sni;
+            singleproxy["congestion-controller"] >>= congestion_controller;
+            singleproxy["udp-relay-mode"] >>= udp_relay_mode;
+            reduce_rtt = safe_as<std::string>(singleproxy["reduce-rtt"]);
+            disable_sni = safe_as<std::string>(singleproxy["disable-sni"]);
+            alpn_list.clear();
+            if(singleproxy["alpn"].IsSequence())
+            {
+                string_array alpn_array;
+                for(auto &&item : singleproxy["alpn"])
+                    alpn_array.emplace_back(item.as<std::string>());
+                alpn_list = join(alpn_array, ",");
+            }
+            else
+                singleproxy["alpn"] >>= alpn_list;
+
+            tuicConstruct(node, group, ps, server, port, id, password, token, sni, alpn_list, congestion_controller, udp_relay_mode, reduce_rtt, disable_sni, udp, tfo, scv, underlying_proxy);
+            break;
+        case "mieru"_hash:
+            group = MIERU_DEFAULT_GROUP;
+
+            singleproxy["username"] >>= user;
+            singleproxy["password"] >>= password;
+            singleproxy["transport"] >>= transport;
+            singleproxy["multiplexing"] >>= multiplexing;
+            singleproxy["handshake-mode"] >>= handshake_mode;
+            singleproxy["traffic-pattern"] >>= traffic_pattern;
+
+            mieruConstruct(node, group, ps, server, port, port_range, transport, user, password, multiplexing, handshake_mode, traffic_pattern, udp, tfo, scv, underlying_proxy);
+            break;
         default:
             continue;
         }
@@ -1622,6 +1833,313 @@ void explodeAnyTLS(std::string anytls, Proxy &node) {
     if (remarks.empty())
         remarks = add + ":" + port;
     anyTLSConstruct(node, ANYTLS_DEFAULT_GROUP, remarks, add, port, password, sni, udp, tribool(), scv, "");
+}
+
+void explodeVLESS(std::string vless, Proxy &node)
+{
+    std::string add, port, uuid, flow, encryption, security, network, host, path, mode, sni, alpn, fingerprint, public_key, short_id, spider_x, remarks;
+    std::string addition;
+    tribool udp, scv;
+
+    vless = vless.substr(8); // "vless://"
+    string_size pos = vless.rfind('#');
+    if (pos != std::string::npos)
+    {
+        remarks = urlDecode(vless.substr(pos + 1));
+        vless.erase(pos);
+    }
+
+    pos = vless.rfind('?');
+    if (pos != std::string::npos)
+    {
+        addition = vless.substr(pos + 1);
+        vless.erase(pos);
+    }
+
+    if (regGetMatch(vless, R"(^(.*?)@(.*):(\d+)$)", 4, 0, &uuid, &add, &port))
+        return;
+    if (port == "0")
+        return;
+
+    uuid = urlDecode(uuid);
+    add = urlDecode(add);
+
+    encryption = getUrlArg(addition, "encryption");
+    if (encryption.empty())
+        encryption = "none";
+    flow = getUrlArg(addition, "flow");
+    security = getUrlArg(addition, "security");
+    if (security.empty())
+        security = "none";
+    network = getUrlArg(addition, "type");
+    if (network.empty())
+        network = getUrlArg(addition, "network");
+    if (network.empty())
+        network = "tcp";
+    host = urlDecode(getUrlArg(addition, "host"));
+    path = urlDecode(getUrlArg(addition, "path"));
+    mode = getUrlArg(addition, "mode");
+    sni = getUrlArg(addition, "sni");
+    if (sni.empty())
+        sni = getUrlArg(addition, "peer");
+    if (sni.empty())
+        sni = getUrlArg(addition, "servername");
+    alpn = getUrlArg(addition, "alpn");
+    fingerprint = getUrlArg(addition, "fp");
+    if (fingerprint.empty())
+        fingerprint = getUrlArg(addition, "fingerprint");
+    public_key = getUrlArg(addition, "pbk");
+    if (public_key.empty())
+        public_key = getUrlArg(addition, "publicKey");
+    short_id = getUrlArg(addition, "sid");
+    if (short_id.empty())
+        short_id = getUrlArg(addition, "shortId");
+    spider_x = getUrlArg(addition, "spx");
+    if (spider_x.empty())
+        spider_x = getUrlArg(addition, "spiderX");
+    udp = getUrlArg(addition, "udp");
+    scv = getUrlArg(addition, "allowInsecure");
+    if (scv.is_undef())
+        scv = getUrlArg(addition, "insecure");
+
+    if (network == "grpc")
+    {
+        std::string service_name = getUrlArg(addition, "serviceName");
+        if (service_name.empty())
+            service_name = getUrlArg(addition, "servicename");
+        if (!service_name.empty())
+            path = service_name;
+    }
+
+    if (remarks.empty())
+        remarks = add + ":" + port;
+
+    vlessConstruct(node, VLESS_DEFAULT_GROUP, remarks, add, port, uuid, flow, encryption, security, network, host, path, mode, sni, alpn, fingerprint, public_key, short_id, spider_x, udp, tribool(), scv, tribool(), "");
+}
+
+void explodeTUIC(std::string tuic, Proxy &node)
+{
+    std::string add, port, uuid, password, token, sni, alpn, congestion_controller, udp_relay_mode, remarks, userinfo;
+    std::string addition;
+    tribool udp, scv, reduce_rtt, disable_sni;
+
+    tuic = tuic.substr(7); // "tuic://"
+    string_size pos = tuic.rfind('#');
+    if (pos != std::string::npos)
+    {
+        remarks = urlDecode(tuic.substr(pos + 1));
+        tuic.erase(pos);
+    }
+
+    pos = tuic.rfind('?');
+    if (pos != std::string::npos)
+    {
+        addition = tuic.substr(pos + 1);
+        tuic.erase(pos);
+    }
+
+    if (regGetMatch(tuic, R"(^(.*?)@(.*):(\d+)$)", 4, 0, &userinfo, &add, &port))
+        return;
+    if (port == "0")
+        return;
+
+    add = urlDecode(add);
+    pos = userinfo.find(':');
+    if (pos != std::string::npos)
+    {
+        uuid = urlDecode(userinfo.substr(0, pos));
+        password = urlDecode(userinfo.substr(pos + 1));
+    }
+    else
+        token = urlDecode(userinfo);
+
+    sni = getUrlArg(addition, "sni");
+    alpn = getUrlArg(addition, "alpn");
+    congestion_controller = getUrlArg(addition, "congestion_control");
+    if (congestion_controller.empty())
+        congestion_controller = getUrlArg(addition, "congestion-controller");
+    udp_relay_mode = getUrlArg(addition, "udp_relay_mode");
+    if (udp_relay_mode.empty())
+        udp_relay_mode = getUrlArg(addition, "udp-relay-mode");
+    reduce_rtt = getUrlArg(addition, "reduce_rtt");
+    if (reduce_rtt.is_undef())
+        reduce_rtt = getUrlArg(addition, "reduce-rtt");
+    disable_sni = getUrlArg(addition, "disable_sni");
+    if (disable_sni.is_undef())
+        disable_sni = getUrlArg(addition, "disable-sni");
+    udp = getUrlArg(addition, "udp");
+    scv = getUrlArg(addition, "allow_insecure");
+    if (scv.is_undef())
+        scv = getUrlArg(addition, "allowInsecure");
+    if (scv.is_undef())
+        scv = getUrlArg(addition, "insecure");
+
+    if (remarks.empty())
+        remarks = add + ":" + port;
+
+    tuicConstruct(node, TUIC_DEFAULT_GROUP, remarks, add, port, uuid, password, token, sni, alpn, congestion_controller, udp_relay_mode, reduce_rtt, disable_sni, udp, tribool(), scv, "");
+}
+
+std::string mieruMultiplexingFromLevel(const std::string &level)
+{
+    switch(to_int(level, -1))
+    {
+    case 0:
+        return "MULTIPLEXING_OFF";
+    case 1:
+        return "MULTIPLEXING_LOW";
+    case 2:
+        return "MULTIPLEXING_MIDDLE";
+    case 3:
+        return "MULTIPLEXING_HIGH";
+    default:
+        return "";
+    }
+}
+
+void explodeMieruJson(const std::string &content, const std::string &remarks, Proxy &node)
+{
+    Node root = Load(content);
+    Node profile;
+    if(root["profiles"].IsDefined() && root["profiles"].IsSequence() && root["profiles"].size() > 0)
+    {
+        std::string active = root["activeProfile"].IsDefined() ? safe_as<std::string>(root["activeProfile"]) : "";
+        profile = root["profiles"][0];
+        if(!active.empty())
+        {
+            for(size_t i = 0; i < root["profiles"].size(); i++)
+            {
+                std::string name = root["profiles"][i]["profileName"].IsDefined() ? safe_as<std::string>(root["profiles"][i]["profileName"]) : "";
+                if(name == active)
+                {
+                    profile = root["profiles"][i];
+                    break;
+                }
+            }
+        }
+    }
+    else
+        profile = root;
+
+    std::string username, password, server, port, port_range, transport, multiplexing, handshake_mode, traffic_pattern;
+    profile["user"]["name"] >>= username;
+    profile["user"]["password"] >>= password;
+    profile["handshakeMode"] >>= handshake_mode;
+    if(handshake_mode.empty())
+        profile["handshake-mode"] >>= handshake_mode;
+    profile["trafficPattern"] >>= traffic_pattern;
+    if(traffic_pattern.empty())
+        profile["traffic-pattern"] >>= traffic_pattern;
+    if(profile["multiplexing"].IsDefined())
+    {
+        if(profile["multiplexing"].IsScalar())
+            profile["multiplexing"] >>= multiplexing;
+        else
+        {
+            std::string level;
+            profile["multiplexing"]["level"] >>= level;
+            multiplexing = mieruMultiplexingFromLevel(level);
+        }
+    }
+
+    if(profile["servers"].IsDefined() && profile["servers"].IsSequence() && profile["servers"].size() > 0)
+    {
+        Node srv = profile["servers"][0];
+        srv["ipAddress"] >>= server;
+        if(server.empty())
+            srv["domainName"] >>= server;
+        if(srv["portBindings"].IsDefined() && srv["portBindings"].IsSequence() && srv["portBindings"].size() > 0)
+        {
+            Node binding = srv["portBindings"][0];
+            binding["portRange"] >>= port_range;
+            if(port_range.empty())
+                binding["port"] >>= port;
+            binding["protocol"] >>= transport;
+        }
+        else
+            srv["port"] >>= port;
+    }
+
+    if(server.empty())
+        return;
+    if(port == "0")
+        port.clear();
+    if(port.empty() && port_range.empty())
+        return;
+
+    std::string remark = remarks;
+    if(remark.empty())
+    {
+        remark = profile["profileName"].IsDefined() ? safe_as<std::string>(profile["profileName"]) : "";
+        if(remark.empty())
+            remark = server + (port.empty() ? ":" + port_range : ":" + port);
+    }
+
+    mieruConstruct(node, MIERU_DEFAULT_GROUP, remark, server, port, port_range, transport, username, password, multiplexing, handshake_mode, traffic_pattern, tribool(), tribool(), tribool(), "");
+}
+
+void explodeMieru(std::string mieru, Proxy &node)
+{
+    std::string content = mieru.substr(8); // "mieru://"
+    std::string remarks;
+    string_size pos = content.rfind('#');
+    if(pos != std::string::npos)
+    {
+        remarks = urlDecode(content.substr(pos + 1));
+        content.erase(pos);
+    }
+
+    std::string decoded = trim(urlSafeBase64Decode(content));
+    if(startsWith(decoded, "{"))
+    {
+        try
+        {
+            explodeMieruJson(decoded, remarks, node);
+        }
+        catch(std::exception &e)
+        {
+            // ignore malformed json payload
+        }
+        if(node.Type != ProxyType::Unknown)
+            return;
+    }
+
+    // fallback: mieru://username:password@host:port?transport=TCP&port_range=2000-3000
+    std::string addition, userinfo, add, port, port_range, transport, multiplexing, handshake_mode, traffic_pattern, username, password;
+    pos = content.rfind('?');
+    if(pos != std::string::npos)
+    {
+        addition = content.substr(pos + 1);
+        content.erase(pos);
+    }
+    if(regGetMatch(content, R"(^(.*?)@(.*):(\d+)$)", 4, 0, &userinfo, &add, &port))
+        return;
+    pos = userinfo.find(':');
+    if(pos != std::string::npos)
+    {
+        username = urlDecode(userinfo.substr(0, pos));
+        password = urlDecode(userinfo.substr(pos + 1));
+    }
+    else
+        username = urlDecode(userinfo);
+    add = urlDecode(add);
+    port_range = getUrlArg(addition, "port_range");
+    if(port_range.empty())
+        port_range = getUrlArg(addition, "port-range");
+    transport = getUrlArg(addition, "transport");
+    if(transport.empty())
+        transport = getUrlArg(addition, "protocol");
+    multiplexing = getUrlArg(addition, "multiplexing");
+    handshake_mode = getUrlArg(addition, "handshake_mode");
+    if(handshake_mode.empty())
+        handshake_mode = getUrlArg(addition, "handshake-mode");
+    traffic_pattern = getUrlArg(addition, "traffic_pattern");
+    if(traffic_pattern.empty())
+        traffic_pattern = getUrlArg(addition, "traffic-pattern");
+
+    if(remarks.empty())
+        remarks = add + ":" + port;
+    mieruConstruct(node, MIERU_DEFAULT_GROUP, remarks, add, port, port_range, transport, username, password, multiplexing, handshake_mode, traffic_pattern, tribool(), tribool(), tribool(), "");
 }
 
 // peer = (public-key = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=, allowed-ips = "0.0.0.0/0, ::/0", endpoint = engage.cloudflareclient.com:2408, client-id = 139/184/125),(public-key = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=, endpoint = engage.cloudflareclient.com:2408)
@@ -2594,6 +3112,12 @@ void explode(const std::string &link, Proxy &node)
         explodeHysteria2(link, node);
     else if (startsWith(link, "anytls://"))
         explodeAnyTLS(link, node);
+    else if (startsWith(link, "vless://"))
+        explodeVLESS(link, node);
+    else if (startsWith(link, "tuic://"))
+        explodeTUIC(link, node);
+    else if (startsWith(link, "mieru://"))
+        explodeMieru(link, node);
     else if(isLink(link))
         explodeHTTPSub(link, node);
 }
@@ -2609,6 +3133,25 @@ void explodeSub(std::string sub, std::vector<Proxy> &nodes)
     {
         explodeSSD(sub, nodes);
         processed = true;
+    }
+
+    //try to parse as mieru client configuration (json)
+    if(!processed && regFind(sub, "\"portBindings\"\\s*:") && regFind(sub, "\"servers\"\\s*:"))
+    {
+        try
+        {
+            Proxy node;
+            explodeMieruJson(sub, "", node);
+            if(node.Type != ProxyType::Unknown)
+            {
+                nodes.emplace_back(std::move(node));
+                processed = true;
+            }
+        }
+        catch(std::exception &e)
+        {
+            //ignore malformed mieru configuration
+        }
     }
 
     //try to parse as clash configuration

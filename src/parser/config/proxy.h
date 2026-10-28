@@ -24,6 +24,9 @@ enum class ProxyType
     Hysteria,
     Hysteria2,
     AnyTLS,
+    VLESS,
+    TUIC,
+    Mieru,
 };
 
 inline String getProxyTypeName(ProxyType type)
@@ -54,6 +57,12 @@ inline String getProxyTypeName(ProxyType type)
         return "Hysteria2";
     case ProxyType::AnyTLS:
         return "AnyTLS";
+    case ProxyType::VLESS:
+        return "VLESS";
+    case ProxyType::TUIC:
+        return "TUIC";
+    case ProxyType::Mieru:
+        return "Mieru";
     default:
         return "Unknown";
     }
@@ -129,6 +138,26 @@ struct Proxy
     uint32_t HopInterval;
     StringArray Alpn;
 
+    /// VLESS
+    String Flow;
+    String Encryption;
+    String Security; // none / tls / reality
+    String ShortId;
+    String SpiderX;
+    String Mode; // xhttp mode
+
+    /// TUIC
+    String Token;
+    String CongestionController;
+    String UDPRelayMode;
+    tribool ReduceRTT;
+    tribool DisableSNI;
+
+    /// Mieru
+    String Multiplexing;
+    String HandshakeMode;
+    String TrafficPattern;
+
     uint32_t CWND = 0;
 };
 
@@ -143,5 +172,8 @@ struct Proxy
 #define HYSTERIA_DEFAULT_GROUP "HysteriaProvider"
 #define HYSTERIA2_DEFAULT_GROUP "Hysteria2Provider"
 #define ANYTLS_DEFAULT_GROUP "AnyTLSProvider"
+#define VLESS_DEFAULT_GROUP "VLESSProvider"
+#define TUIC_DEFAULT_GROUP "TUICProvider"
+#define MIERU_DEFAULT_GROUP "MieruProvider"
 
 #endif // PROXY_H_INCLUDED

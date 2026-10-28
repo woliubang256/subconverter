@@ -49,6 +49,14 @@ Notice:
 
    - https://t.me/http?server=1.2.3.4&port=233&user=user&pass=pass&remark=Example
 
+### Supported proxy protocols (as source)
+
+`ss`, `ssr`, `vmess`, `vless` (including `security=reality`, `encryption` and `type=xhttp`), `trojan`,
+`tuic`, `hysteria`, `hysteria2`, `anytls`, `mieru`, `snell`, `wireguard`, `http`/`https`, `socks5`.
+
+These nodes can be converted to `clash` (Clash.Meta / mihomo), `singbox` and `v2ray` (share links).
+`mieru` is emitted for `clash` and `v2ray` only, `xhttp` transport is skipped for `singbox`, and
+`tuic` v4 (token based) is skipped for `singbox`.
 
 ---
 
