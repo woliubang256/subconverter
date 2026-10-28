@@ -1,6 +1,8 @@
 # subconverter-docker
 
-This is a minimized image to run https://github.com/tindy2013/subconverter.
+This is a minimized image built from this repository
+(https://github.com/woliubang256/subconverter, a fork of
+https://github.com/tindy2013/subconverter).
 
 Images are published to the GitHub Container Registry (GHCR) instead of Docker Hub:
 `ghcr.io/woliubang256/subconverter`. The legacy Docker Hub workflow is kept in
