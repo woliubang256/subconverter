@@ -1,11 +1,14 @@
 #include <string>
 #include <mutex>
+#include <algorithm>
+#include <cctype>
 #include <toml.hpp>
 
 #include "config/binding.h"
 #include "handler/webget.h"
 #include "script/cron.h"
 #include "server/webserver.h"
+#include "utils/file.h"
 #include "utils/logger.h"
 #include "utils/network.h"
 #include "interfaces.h"
@@ -654,6 +657,7 @@ void readTOMLConf(toml::value &root)
                   "managed_config_prefix", global.managedConfigPrefix,
                   "config_update_interval", global.updateInterval,
                   "config_update_strict", global.updateStrict,
+                  "override_acl4ssr_config", global.overrideACL4SSRConfig,
                   "quanx_device_id", global.quanXDevID
     );
 
@@ -923,6 +927,7 @@ void readConf()
     ini.get_if_exist("managed_config_prefix", global.managedConfigPrefix);
     ini.get_int_if_exist("config_update_interval", global.updateInterval);
     ini.get_bool_if_exist("config_update_strict", global.updateStrict);
+    ini.get_bool_if_exist("override_acl4ssr_config", global.overrideACL4SSRConfig);
     ini.get_if_exist("quanx_device_id", global.quanXDevID);
 
     ini.enter_section("emojis");
@@ -1199,6 +1204,55 @@ int loadExternalTOML(toml::value &root, ExternalConfig &ext)
     ext.rename = toml::get<RegexMatchConfigs>(toml::value(renameconfs));
 
     return 0;
+}
+
+static bool containsIgnoreCase(const std::string &haystack, const std::string &needle)
+{
+    if(needle.empty() || haystack.size() < needle.size())
+        return false;
+    auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(),
+                          [](char a, char b) { return std::tolower((unsigned char)a) == std::tolower((unsigned char)b); });
+    return it != haystack.end();
+}
+
+std::string remapExternalConfig(const std::string &path)
+{
+    if(!global.overrideACL4SSRConfig || path.empty() || !isLink(path))
+        return path;
+
+    // Only ACL4SSR configs have a patched copy bundled in base/config/. Everything
+    // else (user configs, other templates) is left untouched.
+    if(!containsIgnoreCase(path, "acl4ssr") || !containsIgnoreCase(path, "/clash/config/"))
+        return path;
+
+    size_t slash = path.find_last_of('/');
+    if(slash == std::string::npos || slash + 1 >= path.size())
+        return path;
+
+    std::string name = path.substr(slash + 1);
+    size_t query = name.find_first_of("?#");
+    if(query != std::string::npos)
+        name.erase(query);
+    if(name.size() <= 4 || name.compare(name.size() - 4, 4, ".ini") != 0)
+        return path;
+
+    std::string local = "config/" + name;
+
+    // Only the configs that carry local fixes are redirected. Anything else keeps
+    // following upstream, so a bundled snapshot can never pin a user to old rules.
+    static const string_array patched = {
+        "ACL4SSR_Online_Full.ini", "ACL4SSR_Online_Full_AdblockPlus.ini",
+        "ACL4SSR_Online_Full_Google.ini", "ACL4SSR_Online_Full_MultiMode.ini",
+        "ACL4SSR_Online_Full_Netflix.ini", "ACL4SSR_Online_Full_NoAuto.ini",
+        "ACL4SSR_Online_Mini_MultiCountry.ini", "ACL4SSR_Online_MultiCountry.ini"
+    };
+    if(std::find(patched.begin(), patched.end(), name) == patched.end())
+        return path;
+    if(!fileExist(local, true))
+        return path;
+
+    writeLog(0, "Using bundled config \"" + local + "\" instead of \"" + path + "\"", LOG_LEVEL_INFO);
+    return local;
 }
 
 int loadExternalConfig(std::string &path, ExternalConfig &ext)

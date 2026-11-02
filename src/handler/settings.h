@@ -47,6 +47,7 @@ struct Settings
     bool addEmoji = false, removeEmoji = false, appendType = false, filterDeprecated = true;
     tribool UDPFlag, TFOFlag, skipCertVerify, TLS13Flag, enableInsert;
     bool enableSort = false, updateStrict = false;
+    bool overrideACL4SSRConfig = true;
     bool clashUseNewField = false, singBoxAddClashModes = true;
     std::string clashProxiesStyle = "flow", clashProxyGroupsStyle = "block";
     std::string proxyConfig, proxyRuleset, proxySubscription;
@@ -100,6 +101,7 @@ extern Settings global;
 
 int importItems(string_array &target, bool scope_limit = true);
 int loadExternalConfig(std::string &path, ExternalConfig &ext);
+std::string remapExternalConfig(const std::string &path);
 
 template <class... Args>
 void parseGroupTimes(const std::string &src, Args... args)

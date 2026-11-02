@@ -443,6 +443,7 @@ std::string subconverter(RESPONSE_CALLBACK_ARGS)
     /// load external configuration
     if(argExternalConfig.empty())
         argExternalConfig = global.defaultExtConfig;
+    argExternalConfig = remapExternalConfig(argExternalConfig);
     if(!argExternalConfig.empty())
     {
         //std::cerr<<"External configuration file provided. Loading...\n";
