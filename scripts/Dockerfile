@@ -44,6 +44,11 @@ RUN set -xe && \
     python3 -m ensurepip && \
     python3 -m pip install gitpython && \
     python3 scripts/update_rules.py -c scripts/rules_config.conf && \
+    for f in ACL4SSR_Online_Full ACL4SSR_Online_Full_AdblockPlus ACL4SSR_Online_Full_Google \
+             ACL4SSR_Online_Full_MultiMode ACL4SSR_Online_Full_Netflix ACL4SSR_Online_Full_NoAuto \
+             ACL4SSR_Online_Mini_MultiCountry ACL4SSR_Online_MultiCountry; do \
+        grep -qF '(?i:' "base/config/$f.ini" || { echo "ERROR: base/config/$f.ini lost its region-group patches (overwritten by an upstream config sync?)" >&2; exit 1; }; \
+    done && \
     cmake -DCMAKE_BUILD_TYPE=Release . && \
     make -j $THREADS
 
